@@ -146,8 +146,8 @@ struct mi_beacon_t{
     uint32_t NMT; //17
     struct{ //01
       uint16_t num;
-      uint8_t longPress; 
-    }Btn; 
+      uint8_t longPress;
+    }Btn;
   };
   uint8_t padding[12];
 };
@@ -228,7 +228,7 @@ struct mi_sensor_t{
     };
     uint32_t raw;
   } eventType;
- 
+
   int RSSI;
   uint32_t lastTime;
   uint32_t lux;
@@ -373,6 +373,7 @@ class MI32SensorCallback : public NimBLEClientCallbacks {
   }
   void onDisconnect(NimBLEClient* pclient) {
     MI32.mode.connected = 0;
+    MI32.mode.willReadBatt = 0;
     AddLog_P2(LOG_LEVEL_DEBUG,PSTR("disconnected %s"), kMI32DeviceType[(MIBLEsensors[MI32.state.sensor].type)-1]);
   }
   bool onConnParamsUpdateRequest(NimBLEClient* MI32Client, const ble_gap_upd_params* params) {
@@ -463,7 +464,7 @@ void MI32notifyCB(NimBLERemoteCharacteristic* pRemoteCharacteristic, uint8_t* pD
 
 /**
  * @brief Remove all colons from null terminated char array
- * 
+ *
  * @param _string Typically representing a MAC-address like AA:BB:CC:DD:EE:FF
  */
 void MI32stripColon(char* _string){
@@ -506,7 +507,7 @@ void MI32HexStringToBytes(char* _string, uint8_t* _byteArray) {
 
 /**
  * @brief Reverse an array of 6 bytes
- * 
+ *
  * @param _mac a byte array of size 6 (typicalliy representing a MAC address)
  */
 void MI32_ReverseMAC(uint8_t _mac[]){
@@ -536,7 +537,7 @@ void MI32AddKey(char* payload){
 
 /**
  * @brief Decrypts payload in place
- * 
+ *
  * @param _buf - pointer to the buffer at position of PID
  * @param _bufSize - buffersize (last position is two bytes behind last byte of TAG)
  * @param _type - sensor type
@@ -609,7 +610,7 @@ int MI32_decryptPacket(char *_buf, uint16_t _bufSize, uint32_t _type){
  */
 
 void MI32nullifyEndOfMQTT_DATA(){
-  char *p = mqtt_data + strlen(mqtt_data);
+  char *p = TasmotaGlobal.mqtt_data + strlen(TasmotaGlobal.mqtt_data);
   while(true){
     *p--;
     if(p[0]==':'){
@@ -685,7 +686,7 @@ uint32_t MIBLEgetSensorSlot(uint8_t (&_MAC)[6], uint16_t _type, uint8_t counter)
       _newSensor.feature.lux=1;
       _newSensor.feature.bat=1;
       break;
-    case NLIGHT: 
+    case NLIGHT:
       _newSensor.events=0x00;
       _newSensor.feature.PIR=1;
       _newSensor.feature.NMT=1;
@@ -717,11 +718,11 @@ uint32_t MIBLEgetSensorSlot(uint8_t (&_MAC)[6], uint16_t _type, uint8_t counter)
 
 /**
  * @brief trigger real-time message for PIR or RC
- * 
+ *
  */
 void MI32triggerTele(void){
     MI32.mode.triggeredTele = 1;
-    mqtt_data[0] = '\0';
+    ResponseClear();
     if (MqttShowSensor()) {
       MqttPublishPrefixTopic_P(TELE, PSTR(D_RSLT_SENSOR), Settings.flag.mqtt_sensor_retain);
   #ifdef USE_RULES
@@ -732,7 +733,7 @@ void MI32triggerTele(void){
 
 /**
  * @brief Is called after every finding of new BLE sensor
- * 
+ *
  */
 void MI32StatusInfo() {
   MI32.mode.shallShowStatusInfo = 0;
@@ -859,7 +860,7 @@ void MI32StartScanTask(){
     xTaskCreatePinnedToCore(
     MI32ScanTask,    /* Function to implement the task */
     "MI32ScanTask",  /* Name of the task */
-    4096,             /* Stack size in words */
+    2048,             /* Stack size in words */
     NULL,             /* Task input parameter */
     0,                /* Priority of the task */
     NULL,             /* Task handle. */
@@ -934,7 +935,7 @@ void MI32SensorTask(void *pvParameters){
         default:
         break;
       }
-      
+
       while (!MI32.mode.readingDone){
         if (timer>150){
           break;
@@ -1007,7 +1008,7 @@ void MI32TimeTask(void *pvParameters){
         pChr = pSvc->getCharacteristic(charUUID);
 
     }
-    if (pChr){    
+    if (pChr){
       if(pChr->canWrite()) {
         union {
           uint8_t buf[5];
@@ -1054,7 +1055,7 @@ void MI32UnitTask(void *pvParameters){
       vTaskDelete( NULL );
     }
 
-  if(MI32ConnectActiveSensor()){  
+  if(MI32ConnectActiveSensor()){
     uint32_t timer = 0;
     while (MI32.mode.connected == 0){
         if (timer>1000){
@@ -1354,7 +1355,7 @@ if(decryptRet!=0){
       if (MIBLEsensors[_slot].type==NLIGHT){
         MIBLEsensors[_slot].eventType.motion = 1; //PIR
         MIBLEsensors[_slot].events++;
-        MIBLEsensors[_slot].NMT = 0; 
+        MIBLEsensors[_slot].NMT = 0;
         MIBLEsensors[_slot].lastTime = millis();
         MI32.mode.shallTriggerTele = 1;
         // AddLog_P2(LOG_LEVEL_DEBUG,PSTR("PIR: primary"),MIBLEsensors[_slot].lux );
@@ -1446,12 +1447,12 @@ void MI32ParseResponse(char *buf, uint16_t bufsize, uint8_t addr[6], int RSSI) {
 
 /**
  * @brief Parse a BLE advertisement packet
- * 
- * @param payload 
- * @param payloadLength 
- * @param CID 
- * @param SVC 
- * @param UUID 
+ *
+ * @param payload
+ * @param payloadLength
+ * @param CID
+ * @param SVC
+ * @param UUID
  */
 void MI32ParseGenericBeacon(uint8_t* payload, size_t payloadLength, uint16_t* CID, uint16_t*SVC, uint16_t* UUID){
   AddLog_P2(LOG_LEVEL_DEBUG_MORE,PSTR("MI32: Beacon:____________"));
@@ -1492,14 +1493,14 @@ void MI32ParseGenericBeacon(uint8_t* payload, size_t payloadLength, uint16_t* CI
 
 /**
  * @brief Handle a generic BLE advertisment in a running scan or to check a beacon
- * 
- * @param payload 
- * @param payloadLength 
- * @param RSSI 
- * @param addr 
+ *
+ * @param payload
+ * @param payloadLength
+ * @param RSSI
+ * @param addr
  */
 void MI32HandleGenericBeacon(uint8_t* payload, size_t payloadLength, int RSSI, uint8_t* addr){
-  if(MI32.state.beaconScanCounter==0){ //handle beacon 
+  if(MI32.state.beaconScanCounter==0){ //handle beacon
     for(auto &_beacon : MIBLEbeacons){
       if(memcmp(addr,_beacon.MAC,6)==0){
         MI32ParseGenericBeacon(payload,payloadLength,&_beacon.CID,&_beacon.SVC,&_beacon.UUID);
@@ -1535,7 +1536,7 @@ void MI32HandleGenericBeacon(uint8_t* payload, size_t payloadLength, int RSSI, u
 
 /**
  * @brief Add a beacon defined by its MAC-address, if only zeros are given, the beacon will be deactivated
- * 
+ *
  * @param index 1-4 beacons are currently supported
  * @param data  null terminated char array representing a MAC-address in hex
  */
@@ -1559,7 +1560,7 @@ void MI32addBeacon(uint8_t index, char* data){
 
 /**
  * @brief Present BLE scan in the console, after that deleting the scan data
- * 
+ *
  */
 void MI32showScanResults(){
   AddLog_P2(LOG_LEVEL_INFO,PSTR("MI32: found %u devices in scan:"), MINBLEscanResult.size());
@@ -1628,7 +1629,7 @@ bool MI32readBat(char *_buf){
 
 /**
  * @brief Launch functions from Core 1 to make race conditions less likely
- * 
+ *
  */
 
 void MI32Every50mSecond(){
@@ -1660,7 +1661,7 @@ void MI32EverySecond(bool restart){
     if(_beacon.active == false) continue;
     _activeBeacons++;
     _beacon.time++;
-    Response_P(PSTR("{\"Beacon%u\":{\"Time\":%u}}"), _beacon.time);
+    Response_P(PSTR("{\"Beacon%u\":{\"Time\":%u}}"), _idx, _beacon.time);
     XdrvRulesProcess();
   }
   if(_activeBeacons==0) MI32.mode.activeBeacon = 0;
@@ -1719,7 +1720,7 @@ void MI32EverySecond(bool restart){
   }
 
   if(_counter==0) {
-  
+
     MI32.state.sensor = _nextSensorSlot;
     MI32.mode.canScan = 0;
     // if (MI32.mode.runningScan|| MI32.mode.connected || MI32.mode.willConnect) return;
@@ -1830,7 +1831,7 @@ bool MI32Cmd(void) {
         XdrvMailbox.payload = MI32.period;
         Response_P(S_JSON_MI32_COMMAND, command, "");
         break;
-#ifdef USE_MI_DECRYPTION        
+#ifdef USE_MI_DECRYPTION
       case CMND_MI32_KEY:
         if (XdrvMailbox.data_len==44){  // a KEY-MAC-string
           MI32AddKey(XdrvMailbox.data);
@@ -1843,7 +1844,7 @@ bool MI32Cmd(void) {
             switch(XdrvMailbox.index){
               case 0:
               MI32.state.beaconScanCounter = 8;
-              Response_P(S_JSON_MI32_BCOMMAND_SVALUE, command, XdrvMailbox.index,PSTR("\"scanning\""));
+              Response_P(S_JSON_MI32_BCOMMAND_SVALUE, command, XdrvMailbox.index,PSTR("scanning"));
               break;
               case 1: case 2: case 3: case 4:
               char _MAC[18];
@@ -1880,7 +1881,7 @@ bool MI32Cmd(void) {
  * Presentation
 \*********************************************************************************************/
 
-const char HTTP_MI32[] PROGMEM = "{s}MI ESP32 v0916{m}%u%s / %u{e}";
+const char HTTP_MI32[] PROGMEM = "{s}MI ESP32 v0916a{m}%u%s / %u{e}";
 const char HTTP_MI32_MAC[] PROGMEM = "{s}%s %s{m}%s{e}";
 const char HTTP_RSSI[] PROGMEM = "{s}%s " D_RSSI "{m}%d dBm{e}";
 const char HTTP_BATTERY[] PROGMEM = "{s}%s" " Battery" "{m}%u %%{e}";
@@ -1916,12 +1917,12 @@ void MI32Show(bool json)
     for (uint32_t i = 0; i < MIBLEsensors.size(); i++) {
       if(MI32.mode.triggeredTele && MIBLEsensors[i].eventType.raw == 0) continue;
       if(MI32.mode.triggeredTele && MIBLEsensors[i].shallSendMQTT==0) continue;
-      
+
       ResponseAppend_P(PSTR(",\"%s-%02x%02x%02x\":"), // do not add the '{' now ...
         kMI32DeviceType[MIBLEsensors[i].type-1],
         MIBLEsensors[i].MAC[3], MIBLEsensors[i].MAC[4], MIBLEsensors[i].MAC[5]);
 
-      uint32_t _positionCurlyBracket = strlen(mqtt_data); // ... this will be a ',' first, but later be replaced
+      uint32_t _positionCurlyBracket = strlen(TasmotaGlobal.mqtt_data); // ... this will be a ',' first, but later be replaced
 
       if((!MI32.mode.triggeredTele && !MI32.option.minimalSummary)||MI32.mode.triggeredTele){
         bool tempHumSended = false;
@@ -2053,9 +2054,9 @@ void MI32Show(bool json)
       }
       if (MI32.option.showRSSI) ResponseAppend_P(PSTR(",\"RSSI\":%d"), MIBLEsensors[i].RSSI);
 
-      if(_positionCurlyBracket==strlen(mqtt_data)) ResponseAppend_P(PSTR(",")); // write some random char, to be overwritten in the next step
+      if(_positionCurlyBracket==strlen(TasmotaGlobal.mqtt_data)) ResponseAppend_P(PSTR(",")); // write some random char, to be overwritten in the next step
       ResponseAppend_P(PSTR("}"));
-      mqtt_data[_positionCurlyBracket] = '{';
+      TasmotaGlobal.mqtt_data[_positionCurlyBracket] = '{';
       MIBLEsensors[i].eventType.raw = 0;
       if(MIBLEsensors[i].shallSendMQTT==1){
         MIBLEsensors[i].shallSendMQTT = 0;

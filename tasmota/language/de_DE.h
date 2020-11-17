@@ -28,7 +28,7 @@
  * Use online command StateText to translate ON, OFF, HOLD and TOGGLE.
  * Use online command Prefix to translate cmnd, stat and tele.
  *
- * Updated until v8.4.0.3
+ * Updated until v9.0.0.3
 \*********************************************************************/
 
 //#define LANGUAGE_MODULE_NAME         // Enable to display "Module Generic" (ie Spanish), Disable to display "Generic Module" (ie English)
@@ -84,6 +84,7 @@
 #define D_DISABLED "deaktiviert"
 #define D_DISTANCE "Abstand"
 #define D_DNS_SERVER "DNS-Server"
+#define D_DO "Disolved Oxygen"
 #define D_DONE "erledigt"
 #define D_DST_TIME "DST"
 #define D_EC "EC"
@@ -125,6 +126,7 @@
 #define D_MULTI_PRESS "Mehrfachdruck"
 #define D_NOISE "Lautstärke"
 #define D_NONE "keine"
+#define D_O2 "Sauerstoff"
 #define D_OFF "aus"
 #define D_OFFLINE "Offline"
 #define D_OK "OK"
@@ -190,6 +192,7 @@
 #define D_UV_POWER "UV Intensität"
 #define D_VERSION "Version"
 #define D_VOLTAGE "Spannung"
+#define D_VOLUME "Volume"
 #define D_WEIGHT "Gewicht"
 #define D_WARMLIGHT "warm"
 #define D_WEB_SERVER "Web-Server"
@@ -744,6 +747,8 @@
 #define D_UNIT_KILOMETER_PER_HOUR "km/h"
 #define D_UNIT_KILOOHM "kΩ"
 #define D_UNIT_KILOWATTHOUR "kWh"
+#define D_UNIT_LITERS "L"
+#define D_UNIT_LITERS_PER_MIN "L/m"
 #define D_UNIT_LUX "lx"
 #define D_UNIT_MICROGRAM_PER_CUBIC_METER "µg/m³"
 #define D_UNIT_MICROMETER "µm"
